@@ -160,7 +160,7 @@ const TOK = [
   ['seedStyle', '홀씨 범례 A·B·C', 0, 2, 1, 0, '홀씨'], ['seedStroke', '털 굵기', .2, 2, .05, .6, '홀씨'], ['seedDot', '털 끝 표식 크기', .3, 3, .05, 1.1, '홀씨'], ['seedLen', '털 길이', .5, 1.6, .05, 1, '홀씨'],
   ['ripeEvery', '떠나는 간격 (초)', 1, 60, 1, 10, '움직임'], ['refillEvery', '새로 채워지는 간격 (초)', 0, 60, 1, 10, '움직임'], ['flySpeed', '바람 세기', 4, 80, 1, 20, '움직임'], ['flutter', '와리가리', 0, 50, 1, 16, '움직임'],
   ['flyLife', '날아가는 시간 (초)', 4, 40, 1, 14, '움직임'], ['flySize', '날아가는 홀씨 크기', 5, 26, .5, 11, '움직임'], ['autoAge', '자동으로 바래기 (0/1)', 0, 1, 1, 1, '움직임'],
-  ['zoomDur', '줌 시간 (ms)', 300, 5000, 50, 1200, '전환'], ['wheelSens', '스크롤 민감도', .0004, .005, .0001, 0.0033, '전환'], ['mergeDots', '모이는 점 수 (다발당)', 40, 600, 10, 250, '전환']
+  ['zoomDur', '줌 시간 (ms)', 300, 5000, 50, 1200, '전환'], ['mergeDur', '내 밭↔한 덩이 시간 (ms)', 300, 6000, 50, 3200, '전환'], ['fieldDur', '모두의 밭 단계 시간 (ms)', 300, 6000, 50, 2000, '전환'], ['wheelSens', '스크롤 민감도', .0004, .005, .0001, 0.0033, '전환'], ['mergeDots', '모이는 점 수 (다발당)', 40, 600, 10, 250, '전환']
 ];
 const TKEY = 'whoooo.tokens.v6', DEF = Object.fromEntries(TOK.map(t => [t[0], t[5]]));
 let T = { ...DEF }; try { Object.assign(T, JSON.parse(localStorage.getItem(TKEY) || '{}')); } catch (e) {}
@@ -318,8 +318,8 @@ function drawMy(t, hov, o = {}) {
     const g = reduced ? 1 : b.grow, rb = b.rb * g, len = gy - b.y, an = sway(b, t);
     b.hx = b.x + Math.sin(an) * len; b.hy = gy - Math.cos(an) * len;
     // 줄기: 땅에서 머리까지 휘어짐
-    ctx.globalAlpha = sa * (o.focus === b.c.id ? o.focusAlpha : 1); ctx.strokeStyle = GREY(T.stemAlpha); ctx.lineWidth = T.lineW * (o.lwk || 1); ctx.beginPath(); ctx.moveTo(b.x, gy); ctx.quadraticCurveTo(b.x + Math.sin(an) * len * .15 + 4, gy - len * .55, b.hx, b.hy + rb * .5); ctx.stroke();
-    if (ba > 0) { const sp = dotSprite(b.c, b.rb), k = rb / b.rb; ctx.save(); ctx.globalAlpha = sa * ba * T.bundleAlpha * (o.focus === b.c.id ? o.focusAlpha : 1); ctx.translate(b.hx, b.hy); ctx.rotate(an * .6); ctx.drawImage(sp.cnv, -sp.S * k / 2, -sp.S * k / 2, sp.S * k, sp.S * k); ctx.restore(); }
+    ctx.globalAlpha = sa * (o.focus === b.c.id ? o.focusAlpha : 1) * (o.nb ? o.nb(b) : 1); ctx.strokeStyle = GREY(T.stemAlpha); ctx.lineWidth = T.lineW * (o.lwk || 1); ctx.beginPath(); ctx.moveTo(b.x, gy); ctx.quadraticCurveTo(b.x + Math.sin(an) * len * .15 + 4, gy - len * .55, b.hx, b.hy + rb * .5); ctx.stroke();
+    if (ba > 0) { const sp = dotSprite(b.c, b.rb), k = rb / b.rb; ctx.save(); ctx.globalAlpha = sa * ba * T.bundleAlpha * (o.focus === b.c.id ? o.focusAlpha : 1); ctx.globalAlpha *= (o.nb ? o.nb(b) : 1); ctx.translate(b.hx, b.hy); ctx.rotate(an * .6); ctx.drawImage(sp.cnv, -sp.S * k / 2, -sp.S * k / 2, sp.S * k, sp.S * k); ctx.restore(); }
     if (hov && hov.b === b) { ctx.globalAlpha = 1; ctx.strokeStyle = GREY(.25); ctx.lineWidth = .5; ctx.setLineDash([1, 3]); ctx.beginPath(); ctx.arc(b.hx, b.hy, rb * 1.2, 0, 6.283); ctx.stroke(); ctx.setLineDash([]); }
     hits.push({ kind: 'bundle', b, x: b.hx, y: b.hy, r: Math.max(18, rb * 1.1) });
   }
@@ -442,9 +442,9 @@ function meLabel(x, y, r, a) { if (a <= 0) return; ctx.globalAlpha = a; ctx.font
 // 모두의 밭 ↔ 내 밭: s = 0 모두의 밭 · 1/3 이웃 밭들 · 2/3 한 덩이 · 1 내 밭
 function renderFM(t, s, hov) {
   const C = diskC(), k = diskK();
-  if (s >= 2 / 3 - 1e-4) { drawMerge(t, 1 - sinE(Math.min(1, (s - 2 / 3) * 3))); return [{ kind: 'me', x: C.x, y: C.y, r: C.R * 1.1 }]; }
+  if (s >= 2 / 3 - 1e-4) { drawMerge(t, 1 - Math.min(1, (s - 2 / 3) * 3)); return [{ kind: 'me', x: C.x, y: C.y, r: C.R * 1.1 }]; }
   const e = s * 1.5, F = [myField.x, myField.y], cp = [F[0] + (C.x - F[0]) * e, F[1] + (C.y - F[1]) * e], so = Math.pow(k, e), si = so / k;
-  drawField(t, null, { so, F, cp, noMe: true, alpha: 1 - smooth(.62, 1, e) });
+  drawField(t, null, { so, F, cp, noMe: true, alpha: 1 - smooth(.5, 1, e) });
   drawDisk(cp[0], cp[1], T.myR * so, Math.max(Math.sqrt(si), 1.4 / k));
   meLabel(cp[0], cp[1], T.myR * so, 1 - smooth(.5, .85, e));
   const h = { kind: 'me', x: cp[0], y: cp[1], r: Math.max(T.myR * 1.6, T.myR * so * 1.15) };
@@ -467,9 +467,9 @@ function drawDisk(cx, cy, R, sz = 1) {
   for (const p of disk.parts) { ctx.fillStyle = p.col; ctx.beginPath(); ctx.arc(cx + p.ux * R, cy + p.uy * R, Math.max(.45, p.s * sz * T.bundleDotSize), 0, 6.283); ctx.fill(); }
 }
 function drawMerge(t, e) {   // e: 0 = 다발들, 1 = 하나의 원
-  drawMy(t, null, { alpha: 1 - smooth(.1, .7, e), bundleAlpha: 1 - smooth(0, .45, e) });
+  drawMy(t, null, { alpha: 1 - smooth(.15, .85, e), bundleAlpha: 1 - smooth(.2, .85, e) });
   if (!disk || disk.sig !== bundles.map(b => b.c.id).join() + T.mergeDots) buildDisk();
-  const C = diskC(); ctx.globalAlpha = smooth(0, .4, e);
+  const C = diskC(); ctx.globalAlpha = smooth(0, .35, e);
   for (const p of disk.parts) { const q = sinE(Math.max(0, Math.min(1, (e - p.dl) / (1 - .4)))), sx = p.b.hx + p.dx, sy = p.b.hy + p.dy, tx = C.x + p.ux * C.R, ty = C.y + p.uy * C.R;
     // 곧장 가지 않고 살짝 휘어서 모임
     const bend = Math.sin(q * Math.PI) * 30 * ((p.s * 7) % 2 - 1);
@@ -510,8 +510,9 @@ function go(to, cat) {
 function stepTrans(dt) {
   const tr = trans, now = performance.now();
   if (tr.wheel && now - tr.lastWheel > 200) { tr.wheel = false; const mv = tr.target - tr.s0; tr.target = Math.abs(mv) > .04 ? nextStop(tr.L, tr.s0, Math.sign(mv)) : tr.s0; }   // 손을 떼면 다음 칸까지 마저 감
-  const w = 2 * Math.PI / Math.max(.2, T.zoomDur / 1000) * .85 * (tr.L === 'FM' && tr.s > .6 ? .55 : 1),   // 색점이 모이고 흩어지는 구간은 더 천천히
-    a = w * w * (tr.target - tr.s) - 2 * w * tr.v;
+  // 구간마다 시간을 따로: 다발 확대 / 내 밭↔한 덩이(색점이 모이고 흩어짐) / 모두의 밭 단계
+  const dur = tr.L === 'MB' ? T.zoomDur : (tr.s > .64 ? T.mergeDur : T.fieldDur),
+    w = 2 * Math.PI / Math.max(.2, dur / 1000) * .85, a = w * w * (tr.target - tr.s) - 2 * w * tr.v;
   tr.v += a * dt / 1000; tr.s = Math.max(0, Math.min(1, tr.s + tr.v * dt / 1000));
   const vNow = viewAt(tr.L, tr.s); if (vNow !== tr.side) { tr.side = vNow; view = vNow; if (view === 'field') fzS = tr.s; updateUI(); }
   if (!tr.wheel && Math.abs(tr.target - tr.s) < .004 && Math.abs(tr.v) < .05) {
@@ -523,10 +524,12 @@ function stepTrans(dt) {
 function drawTrans(t) {
   const tr = trans;
   if (tr.L === 'FM') { renderFM(t, tr.s, null); return; }
-  const e = sinE(tr.s), cxp = tr.F[0] + (tr.C[0] - tr.F[0]) * e, cyp = tr.F[1] + (tr.C[1] - tr.F[1]) * e, so = Math.pow(tr.k, e), si = Math.pow(tr.k, e - 1);
+  const e = tr.s, cxp = tr.F[0] + (tr.C[0] - tr.F[0]) * e, cyp = tr.F[1] + (tr.C[1] - tr.F[1]) * e, so = Math.pow(tr.k, e), si = Math.pow(tr.k, e - 1);
   // 바깥(내 밭): 들어가는 다발의 색점은 곧바로 사라지고, 나머지만 커지며 흐려짐
   // 선 굵기는 확대돼도 그대로(1/so), 들어가는 다발의 줄기·색점은 곧바로 사라짐
-  ctx.save(); ctx.globalAlpha = 1 - smooth(0, .45, e); ctx.translate(cxp, cyp); ctx.scale(so, so); ctx.translate(-tr.F[0], -tr.F[1]); drawMy(t, null, { focus: curCat, focusAlpha: 1 - smooth(0, .06, e), lwk: 1 / so }); ctx.restore();
+  // 옆 다발은 화면 가장자리에 닿기 전에, 중심에서 멀어지는 만큼 서서히 흐려짐
+  const nb = b => { const X = cxp + (b.hx - tr.F[0]) * so, Y = cyp + (b.hy - tr.F[1]) * so; return 1 - smooth(Math.min(W, H) * .2, Math.min(W, H) * .5, Math.hypot(X - W / 2, Y - H / 2)); };
+  ctx.save(); ctx.globalAlpha = 1 - smooth(.15, .75, e); ctx.translate(cxp, cyp); ctx.scale(so, so); ctx.translate(-tr.F[0], -tr.F[1]); drawMy(t, null, { focus: curCat, focusAlpha: 1 - smooth(0, .08, e), lwk: 1 / so, nb: e > 0 ? nb : null }); ctx.restore();
   ctx.save(); ctx.globalAlpha = smooth(0, .1, e); ctx.translate(cxp, cyp); ctx.scale(si, si); ctx.translate(-tr.C[0], -tr.C[1]); drawBundle(t, null, { reveal: smooth(.15, 1, e) }); ctx.restore();
 }
 
