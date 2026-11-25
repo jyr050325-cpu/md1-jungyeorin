@@ -234,7 +234,7 @@ const FONT = () => UFONTS[T.uiFont | 0][1];
 const FX = x => W * (x - 34) / 1680, FY = y => H * (y - 33) / 1049, FS = () => Math.min(W / 1680, H / 1049);
 const SLOTS = [[240, 587, 54], [410, 632, 32], [572, 495, 74], [742, 575, 41], [1070, 602, 69], [905, 640, 30], [325, 700, 24], [655, 690, 26]];
 const GY = () => small ? H * .66 : H * T.groundY;
-const LAND = () => ({ x0: FX(1230), x1: FX(1600), y0: FY(230), y1: GY() - 40 });
+const LAND = () => small ? { x0: W * .72, x1: W * .96, y0: H * .2, y1: GY() - 40 } : { x0: FX(1230), x1: FX(1600), y0: FY(230), y1: GY() - 40 };
 function resize() { DPR = Math.min(2, devicePixelRatio || 1); W = innerWidth; H = innerHeight; small = W < 700; cv.width = W * DPR; cv.height = H * DPR; dotCache.clear(); fieldC = null; place = null; layoutMy(); }
 addEventListener('resize', resize);
 
@@ -284,7 +284,7 @@ function layoutMy() {
     let [x, y, r] = SLOTS[i]; const young = Math.min(1, (D.day - (c.born || 0) + 7) / 21);
     let rb = Math.max(11, 74 * Math.sqrt(postsOf(c.id).length / PER) * sc);   // 다발 크기 = 저장물 개수
     let px = FX(x), py = FY(y) + (gy - FY(778));
-    if (small) { if (i < 5) { px = W * (.12 + .19 * i); py = H * (.38 + (i % 2) * .13); } else { px = W * (.215 + .19 * (i - 5)); py = H * .26; } rb = Math.min(rb, W * .075); }
+    if (small) { const c3 = i % 3, r3 = Math.floor(i / 3); px = W * (.13 + .2 * c3 + (r3 % 2) * .06); py = H * (.25 + r3 * .13 + (c3 % 2) * .04); rb = Math.min(rb, W * .07); }
     const old = bundles.find(b => b.c === c);
     return { c, x: px, y: py, rb, hx: px, hy: py, grow: old ? old.grow : (c.born ? young : 1), ph: (hash(c.id) % 1000) / 159 };
   });
@@ -332,14 +332,15 @@ function drawMy(t, hov, o = {}) {
 
 /* ═════════ 다발 하나: 출처(씨앗) → 갓털 선 → 제목, 3단 위계 ═════════ */
 let curCat = null, bGeom = null, place = null;
-const BC = () => ({ x: small ? W * .5 : W * T.bX, y: small ? H * .52 : H * .54, R: small ? Math.min(W * .44, H * .3) : H * T.bR });
+const BC = () => ({ x: small ? W * .5 : W * T.bX, y: small ? H * .52 : H * .54, R: small ? Math.min(W * .34, H * .26) : H * T.bR });
 const cut = (t, n) => [...t].length > n ? [...t].slice(0, n - 1).join('') + '…' : t;
 function lines(p) {
-  const two = ((hash(p.id + 'L') % 1000) / 1000) < T.twoLine, n = T.labelChars | 0, w = p.title.split(' ');
+  const two = ((hash(p.id + 'L') % 1000) / 1000) < (small ? Math.max(T.twoLine, .75) : T.twoLine), n = (small ? Math.min(T.labelChars, 7) : T.labelChars) | 0, w = p.title.split(' ');
   if (two && w.length > 1) { const half = [...p.title].length / 2; let best = 1, bd = 1e9, acc = 0; for (let i = 1; i < w.length; i++) { acc += [...w[i - 1]].length + 1; const d = Math.abs(acc - half); if (d < bd) { bd = d; best = i; } } return [cut(w.slice(0, best).join(' '), n), cut(w.slice(best).join(' '), n)]; }
   return [cut(p.title, Math.round(n * 1.4))];
 }
-const shownOf = id => postsOf(id).slice(0, T.dataCount | 0);   // 다발 화면에 보일 데이터 수
+const DC = () => (small ? Math.min(T.dataCount, 45) : T.dataCount) | 0;   // 모바일은 덜 빽빽하게
+const shownOf = id => postsOf(id).slice(0, DC());   // 다발 화면에 보일 데이터 수
 function buildGeom(id) {
   const posts = shownOf(id), r = rngS(hash(id + 'g')), by = {};
   posts.forEach(p => (by[p.src] = by[p.src] || []).push(p));
@@ -350,11 +351,11 @@ function buildGeom(id) {
     arr.forEach((p, k) => items.push({ p, a: a + w * (k + .5) / arr.length + (r() - .5) * w / arr.length * .8, u: .16 + .86 * Math.sqrt(r()), node: nodes.length - 1 }));
     a += w;
   });
-  return { id, nodes, items, ids: new Set(posts.map(p => p.id)), dc: T.dataCount | 0 };
+  return { id, nodes, items, ids: new Set(posts.map(p => p.id)), dc: DC() };
 }
 const placeKey = () => [T.labelSize, T.twoLine, T.labelChars, T.labelWeight, T.bR, T.bX, T.uiFont, W, H].join('|');
 function placeLabels(g, cx, cy, R) {
-  const fs = T.labelSize, lh = fs * 1.2, boxes = [], out = [];
+  const fs = small ? Math.min(T.labelSize, 8.5) : T.labelSize, lh = fs * 1.2, boxes = [], out = [];
   ctx.font = `${T.labelWeight} ${fs}px ${FONT()}`;
   const over = q => boxes.some(o => Math.abs(o.x - q.x) < (o.w + q.w) / 2 && Math.abs(o.y - q.y) < (o.h + q.h) / 2);
   for (const it of g.items.slice().sort((a, b) => a.p.seen - b.p.seen)) {
@@ -368,7 +369,7 @@ function placeLabels(g, cx, cy, R) {
 function drawBundle(t, hov, o = {}) {
   const { x: cx, y: cy, R } = BC(), c = catOf(curCat); if (!c) return [];
   const live = new Set(postsOf(curCat).map(p => p.id)), rv = o.reveal ?? 1;
-  if (!bGeom || bGeom.id !== curCat || bGeom.dc !== (T.dataCount | 0) || shownOf(curCat).some(p => !bGeom.ids.has(p.id) && p.saved === 0)) { bGeom = buildGeom(curCat); place = null; }
+  if (!bGeom || bGeom.id !== curCat || bGeom.dc !== DC() || shownOf(curCat).some(p => !bGeom.ids.has(p.id) && p.saved === 0)) { bGeom = buildGeom(curCat); place = null; }
   const g = bGeom, gy = small ? H - 60 : H * .95, hits = [], hn = hov && hov.kind === 'node' ? hov.nd : null;
   if (!place || place.key !== placeKey() || place.id !== curCat) { place = placeLabels(g, cx, cy, R); place.id = curCat; }
   if (T.glow > 0) { const gr = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 1.15); gr.addColorStop(0, ink(c.col, 0, T.glow * rv)); gr.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(cx, cy, R * 1.15, 0, 6.283); ctx.fill(); }
@@ -381,7 +382,7 @@ function drawBundle(t, hov, o = {}) {
   // 2단: 갓털 — 연한 가는 선
   for (const l of L) { const nd = g.nodes[l.it.node], a = vis(l); if (a < .01) continue; ctx.strokeStyle = txtCol(c.col, STEP(l.it.p), T.rayAlpha * (hn && nd === hn ? 2.5 : 1) * a); ctx.lineWidth = T.lineW * .7; ctx.beginPath(); ctx.moveTo(nd.x, nd.y); ctx.lineTo(l.px, l.py); ctx.stroke(); }
   // 3단: 제목 — 색으로만
-  const fs = T.labelSize, lh = fs * 1.2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `${T.labelWeight} ${fs}px ${FONT()}`; ctx.lineJoin = 'round';
+  const fs = small ? Math.min(T.labelSize, 8.5) : T.labelSize, lh = fs * 1.2; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = `${T.labelWeight} ${fs}px ${FONT()}`; ctx.lineJoin = 'round';
   for (let i = L.length - 1; i >= 0; i--) {
     const l = L[i], p = l.it.p, on = hov && hov.p === p, a = vis(l) * (l.born ? Math.min(1, (t - l.born) / 1500) : 1); if (a < .01) continue;
     ctx.globalAlpha = a; ctx.strokeStyle = 'rgba(255,255,255,.92)'; ctx.lineWidth = 2.5; ctx.fillStyle = on ? '#141417' : txtCol(c.col, STEP(p));
@@ -577,7 +578,7 @@ function tick(t, dt) {
     const vyT = T.fallSpeed * (1 + .35 * wob(tt, q.ph, .7)), vxT = (q.tx - q.x) * .25 + T.flutter * wob(tt, q.ph + 2, .9);
     q.vx += (vxT - q.vx) * Math.min(1, s * 1.6); q.vy += (vyT - q.vy) * Math.min(1, s * 1.6);
     q.x += q.vx * s; q.y += q.vy * s; q.rot = Math.sin(tt * .7 + q.ph) * .35;
-    const lo = (small ? W * .08 : L.x0) + R, hi = (small ? W * .92 : L.x1) - R; if (q.x < lo) { q.x = lo; q.vx = Math.abs(q.vx); } if (q.x > hi) { q.x = hi; q.vx = -Math.abs(q.vx); }
+    const lo = L.x0 + R, hi = L.x1 - R; if (q.x < lo) { q.x = lo; q.vx = Math.abs(q.vx); } if (q.x > hi) { q.x = hi; q.vx = -Math.abs(q.vx); }
     if (q.y >= ty) { q.y = ty; q.ground = t; } }
 }
 function seedAlpha(q, t) { const a0 = Math.min(1, (t - q.born) / 900); return q.ground ? a0 * (1 - Math.min(1, (t - q.ground) / (T.groundLife * 1000))) : a0; }
